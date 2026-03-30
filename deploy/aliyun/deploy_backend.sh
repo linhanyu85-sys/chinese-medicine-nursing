@@ -30,11 +30,21 @@ else
   git clone -b "${REPO_BRANCH}" "${REPO_URL}" "${INSTALL_ROOT}"
 fi
 
-APP_ROOT="${INSTALL_ROOT}/stitch/backend"
-if [[ ! -d "${APP_ROOT}" ]]; then
-  echo "部署失败：未找到目录 ${APP_ROOT}"
+PROJECT_ROOT=""
+if [[ -d "${INSTALL_ROOT}/backend" && -d "${INSTALL_ROOT}/deploy/aliyun" ]]; then
+  PROJECT_ROOT="${INSTALL_ROOT}"
+elif [[ -d "${INSTALL_ROOT}/stitch/backend" && -d "${INSTALL_ROOT}/stitch/deploy/aliyun" ]]; then
+  PROJECT_ROOT="${INSTALL_ROOT}/stitch"
+else
+  echo "部署失败：未找到项目目录。"
+  echo "已检查："
+  echo "  - ${INSTALL_ROOT}/backend"
+  echo "  - ${INSTALL_ROOT}/stitch/backend"
   exit 1
 fi
+
+APP_ROOT="${PROJECT_ROOT}/backend"
+DEPLOY_ROOT="${PROJECT_ROOT}/deploy/aliyun"
 
 echo "[3/8] 创建 Python 虚拟环境..."
 python3 -m venv "${APP_ROOT}/.venv"
@@ -45,7 +55,7 @@ echo "[4/8] 安装 Python 依赖..."
 
 echo "[5/8] 准备后端环境变量文件..."
 if [[ ! -f "${ENV_FILE}" ]]; then
-  cp "${INSTALL_ROOT}/stitch/deploy/aliyun/tcm_knowledge_backend.env.example" "${ENV_FILE}"
+  cp "${DEPLOY_ROOT}/tcm_knowledge_backend.env.example" "${ENV_FILE}"
   sed -i "s/APP_PORT=.*/APP_PORT=${APP_PORT}/" "${ENV_FILE}"
   echo ""
   echo "已创建 ${ENV_FILE}，请先编辑 ALIYUN_API_KEY 后再重启服务。"
@@ -53,7 +63,7 @@ fi
 
 echo "[6/8] 写入 systemd 服务..."
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}.service"
-cp "${INSTALL_ROOT}/stitch/deploy/aliyun/tcm-knowledge-backend.service" "${SERVICE_PATH}"
+cp "${DEPLOY_ROOT}/tcm-knowledge-backend.service" "${SERVICE_PATH}"
 sed -i "s#^User=.*#User=${RUN_USER}#" "${SERVICE_PATH}"
 sed -i "s#^WorkingDirectory=.*#WorkingDirectory=${APP_ROOT}#" "${SERVICE_PATH}"
 sed -i "s#^EnvironmentFile=.*#EnvironmentFile=${ENV_FILE}#" "${SERVICE_PATH}"

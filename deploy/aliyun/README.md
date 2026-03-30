@@ -12,14 +12,14 @@
 ## 服务器上执行
 
 ```bash
-sudo bash /opt/tcm-knowledge-nursing/stitch/deploy/aliyun/deploy_backend.sh
+sudo bash /opt/tcm-knowledge-nursing/deploy/aliyun/deploy_backend.sh
 ```
 
 如果第一次执行时还没拉代码，可先：
 
 ```bash
 git clone https://github.com/linhanyu85-sys/chinese-medicine-nursing.git /opt/tcm-knowledge-nursing
-sudo bash /opt/tcm-knowledge-nursing/stitch/deploy/aliyun/deploy_backend.sh
+sudo bash /opt/tcm-knowledge-nursing/deploy/aliyun/deploy_backend.sh
 ```
 
 ## 修改 API Key
