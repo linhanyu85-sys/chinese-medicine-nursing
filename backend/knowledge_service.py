@@ -886,7 +886,8 @@ class KnowledgeService:
 
         matched_tags = dedup_keep_order(matched_tags)[:12]
         recent_focus = str((memory or {}).get("recentFocus") or "")
-        focus = matched_tags[0] if matched_tags else (recent_focus or "临床护理")
+        # 仅在标签明确时设置焦点，避免“临床护理”等泛词把任意问题都拉到同一批条目。
+        focus = matched_tags[0] if matched_tags else (recent_focus or "未识别")
 
         fragments = [frag for frag in re.split(r"[，。；、\n！？? ]+", question) if frag]
         return {
@@ -1025,7 +1026,20 @@ class KnowledgeService:
 
     def search(self, question: str, analysis: dict[str, Any], top_k: int = 5) -> dict[str, Any]:
         safe_k = max(1, min(top_k, 12))
-        query_text = compact_text(" ".join([question, analysis.get("focus", ""), " ".join(analysis.get("memoryTags", []))]))
+
+        focus = str(analysis.get("focus") or "").strip()
+        # 泛化焦点不参与检索，避免将任意问题都误判为同一类护理场景。
+        if focus in {"未识别", "临床护理", "一般咨询"}:
+            focus = ""
+
+        memory_terms = [item for item in (analysis.get("memoryTags") or [])[:4] if item]
+        query_parts = [question]
+        if focus:
+            query_parts.append(focus)
+        if memory_terms:
+            query_parts.append(" ".join(memory_terms))
+        query_text = compact_text(" ".join(query_parts))
+
         query_terms = dedup_keep_order(terms_of(query_text) + (analysis.get("keywords") or []))
         query_terms = expand_query_terms(query_text, query_terms)
         query_vector = vector_of(query_text)
@@ -1037,8 +1051,24 @@ class KnowledgeService:
             ranked.append((score, article, basis))
 
         ranked.sort(key=lambda item: item[0], reverse=True)
-        picked = [item for item in ranked[: safe_k * 4] if item[0] >= 10][:safe_k]
+
+        question_text = compact_text(question)
+        broad_question = not matched_tags and not any(key in question_text for key in COMMON_KEYWORDS)
+
+        # 普通问题需要更高阈值，减少“硬命中”误导；临床问题保留较低阈值保证召回率。
+        base_threshold = 10.0
+        if not matched_tags and len(query_terms) <= 4:
+            base_threshold = 28.0
+        if broad_question:
+            base_threshold = max(base_threshold, 40.0)
+        picked = [item for item in ranked[: safe_k * 4] if item[0] >= base_threshold][:safe_k]
         chapter_context: dict[str, Any] | None = None
+
+        # 对“泛问句”优先走章节回溯，不把弱相关条目当成精准命中。
+        if broad_question and picked:
+            top_score = picked[0][0]
+            if top_score < 52:
+                picked = []
 
         if not picked and self.articles:
             chapter = self._best_chapter_fallback(query_vector, query_terms)
