@@ -1,0 +1,15 @@
+[Unit]
+Description=TCM Knowledge Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/tcm-knowledge-nursing/stitch/backend
+EnvironmentFile=/etc/tcm-knowledge-backend.env
+ExecStart=/opt/tcm-knowledge-nursing/stitch/backend/.venv/bin/python /opt/tcm-knowledge-nursing/stitch/backend/server.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

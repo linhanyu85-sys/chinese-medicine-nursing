@@ -1,0 +1,16 @@
+backend/local_config.json
+backend/.venv/
+backend/__pycache__/
+backend/data/session_memory.json
+backend/*.log
+app-mobile/node_modules/
+app-mobile/.expo/
+app-mobile/.expo-out-temp/
+app-mobile/.expo-check/
+app-mobile/dist/
+app-mobile/expo_tunnel.log
+app-mobile/expo_tunnel.err
+app-mobile/metro.log
+*.pyc
+*.pyo
+*.tmp

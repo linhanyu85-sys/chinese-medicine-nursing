@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html class="light" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Clinical TCM - 知识库</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&amp;family=Manrope:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-primary-container": "#96a9be",
+                        "on-surface-variant": "#43474c",
+                        "surface-variant": "#e4e2dd",
+                        "primary-fixed": "#d1e4fb",
+                        "on-primary-fixed": "#091d2e",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#1b1c19",
+                        "on-secondary": "#ffffff",
+                        "on-error-container": "#93000a",
+                        "secondary-fixed-dim": "#add461",
+                        "on-tertiary-fixed-variant": "#92030f",
+                        "on-background": "#1b1c19",
+                        "surface": "#fbf9f4",
+                        "error-container": "#ffdad6",
+                        "on-primary-fixed-variant": "#36485b",
+                        "background": "#fbf9f4",
+                        "tertiary-container": "#7f000a",
+                        "outline": "#74777d",
+                        "primary-container": "#2c3e50",
+                        "on-secondary-fixed": "#131f00",
+                        "error": "#ba1a1a",
+                        "tertiary": "#560005",
+                        "surface-container-lowest": "#ffffff",
+                        "on-secondary-container": "#4e6e00",
+                        "on-tertiary-container": "#ff8277",
+                        "tertiary-fixed": "#ffdad6",
+                        "surface-tint": "#4e6073",
+                        "secondary-fixed": "#c8f17a",
+                        "tertiary-fixed-dim": "#ffb4ac",
+                        "surface-container": "#f0eee9",
+                        "surface-container-high": "#eae8e3",
+                        "on-secondary-fixed-variant": "#364e00",
+                        "surface-dim": "#dbdad5",
+                        "inverse-surface": "#30312e",
+                        "outline-variant": "#c4c6cd",
+                        "inverse-on-surface": "#f2f1ec",
+                        "inverse-primary": "#b5c8df",
+                        "on-error": "#ffffff",
+                        "on-tertiary-fixed": "#410003",
+                        "surface-container-highest": "#e4e2dd",
+                        "on-primary": "#ffffff",
+                        "surface-bright": "#fbf9f4",
+                        "primary": "#162839",
+                        "primary-fixed-dim": "#b5c8df",
+                        "surface-container-low": "#f5f3ee",
+                        "secondary-container": "#c8f17a",
+                        "secondary": "#496800"
+                    },
+                    fontFamily: {
+                        "headline": ["Newsreader", "serif"],
+                        "body": ["Manrope", "sans-serif"],
+                        "label": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        body {
+            background-color: #fbf9f4;
+            background-image: radial-gradient(#e4e2dd 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+            background-attachment: fixed;
+        }
+        .text-grain {
+            position: relative;
+        }
+        .text-grain::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            opacity: 0.03;
+            pointer-events: none;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body text-on-background antialiased pb-24">
+<!-- Top AppBar -->
+<header class="sticky top-0 z-50 bg-[#fbf9f4] dark:bg-slate-900 flex justify-between items-center w-full px-6 py-4 max-w-full">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary" data-icon="menu_book">menu_book</span>
+<h1 class="text-xl font-bold font-['Newsreader'] italic text-[#162839] dark:text-slate-100">Clinical TCM</h1>
+</div>
+<div class="flex items-center gap-4">
+<button class="p-2 rounded-full hover:bg-[#f5f3ee] transition-colors">
+<span class="material-symbols-outlined text-[#162839]" data-icon="search">search</span>
+</button>
+</div>
+</header>
+<main class="px-5 pt-2">
+<!-- Search Area -->
+<section class="mb-6">
+<div class="relative group">
+<input class="w-full bg-surface-container-low border-none border-b border-outline-variant focus:ring-0 focus:border-primary py-4 pl-12 pr-4 rounded-xl text-primary placeholder-on-surface-variant/60 shadow-sm transition-all" placeholder="搜索中医适宜技术、病证..." type="text"/>
+<span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-primary/60" data-icon="manage_search">manage_search</span>
+</div>
+</section>
+<!-- Category & Filters -->
+<section class="mb-8 space-y-4">
+<div class="flex items-center justify-between">
+<h2 class="font-headline italic text-lg text-primary">技术分类</h2>
+<button class="text-xs font-semibold uppercase tracking-wider text-secondary flex items-center gap-1">
+                    全部分类 <span class="material-symbols-outlined text-sm" data-icon="chevron_right">chevron_right</span>
+</button>
+</div>
+<div class="flex gap-3 overflow-x-auto pb-2 scrollbar-hide no-scrollbar">
+<button class="flex-none px-5 py-2.5 rounded-full bg-primary text-white text-sm font-medium shadow-md">全部分类</button>
+<button class="flex-none px-5 py-2.5 rounded-full bg-surface-container-high text-primary text-sm font-medium hover:bg-secondary/10">针刺类</button>
+<button class="flex-none px-5 py-2.5 rounded-full bg-surface-container-high text-primary text-sm font-medium hover:bg-secondary/10">灸术类</button>
+<button class="flex-none px-5 py-2.5 rounded-full bg-surface-container-high text-primary text-sm font-medium hover:bg-secondary/10">推拿类</button>
+<button class="flex-none px-5 py-2.5 rounded-full bg-surface-container-high text-primary text-sm font-medium hover:bg-secondary/10">外治类</button>
+</div>
+<div class="flex items-center gap-2 pt-2">
+<span class="material-symbols-outlined text-secondary text-lg" data-icon="sell">sell</span>
+<div class="flex gap-2 overflow-x-auto no-scrollbar">
+<span class="text-[11px] font-bold uppercase tracking-widest px-2 py-0.5 border border-outline-variant text-on-surface-variant rounded">围手术期</span>
+<span class="text-[11px] font-bold uppercase tracking-widest px-2 py-0.5 border border-outline-variant text-on-surface-variant rounded">失眠专护</span>
+<span class="text-[11px] font-bold uppercase tracking-widest px-2 py-0.5 border border-outline-variant text-on-surface-variant rounded">疼痛管理</span>
+</div>
+</div>
+</section>
+<!-- Content List -->
+<section class="space-y-4">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border-l-4 border-secondary flex flex-col gap-4 group active:scale-[0.98] transition-all">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<span class="text-[10px] font-bold uppercase text-secondary-container bg-secondary px-2 py-0.5 rounded-sm">灸术类</span>
+<h3 class="text-xl font-bold text-primary font-headline">平衡火罐技术</h3>
+</div>
+<span class="material-symbols-outlined text-outline-variant group-hover:text-primary transition-colors" data-icon="bookmark">bookmark</span>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-xs rounded-lg">感冒</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-xs rounded-lg">背肌劳损</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-xs rounded-lg">疲劳综合征</span>
+</div>
+<div class="flex items-center gap-3 py-2 border-t border-surface-container-high mt-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="history">history</span>
+<span class="text-[11px] text-on-surface-variant">更新于 2023-11-20</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="timer">timer</span>
+<span class="text-[11px] text-on-surface-variant">约 15-20 分钟</span>
+</div>
+</div>
+</div>
+<!-- Card 2 (Highlight) -->
+<div class="bg-primary text-white p-5 rounded-2xl shadow-lg relative overflow-hidden group">
+<div class="absolute -right-4 -top-4 opacity-10">
+<span class="material-symbols-outlined text-8xl" data-icon="spa" style="font-variation-settings: 'FILL' 1;">spa</span>
+</div>
+<div class="relative z-10 flex flex-col gap-4">
+<div class="space-y-1">
+<span class="text-[10px] font-bold uppercase bg-tertiary-container text-on-tertiary-container px-2 py-0.5 rounded-sm">急症处理</span>
+<h3 class="text-xl font-bold font-headline text-surface">中药穴位贴敷</h3>
+</div>
+<p class="text-sm text-surface-container opacity-80 leading-relaxed line-clamp-2">
+                        利用中药制剂贴敷于特定穴位，通过经络传导发挥药效，适用于各种慢性疾病及亚健康调理。
+                    </p>
+<div class="flex justify-between items-center pt-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary-fixed text-sm" data-icon="check_circle">check_circle</span>
+<span class="text-xs font-medium">临床路径已审核</span>
+</div>
+<span class="material-symbols-outlined" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border-l-4 border-outline-variant flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<span class="text-[10px] font-bold uppercase text-on-surface-variant/80 bg-surface-container-high px-2 py-0.5 rounded-sm">推拿类</span>
+<h3 class="text-xl font-bold text-primary font-headline">小儿推拿（捏脊法）</h3>
+</div>
+<span class="material-symbols-outlined text-outline-variant" data-icon="bookmark">bookmark</span>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-xs rounded-lg">厌食</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-xs rounded-lg">消化不良</span>
+</div>
+<div class="flex items-center gap-3 py-2 border-t border-surface-container-high mt-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="history">history</span>
+<span class="text-[11px] text-on-surface-variant">更新于 2023-12-05</span>
+</div>
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="clinical_notes">clinical_notes</span>
+<span class="text-[11px] text-on-surface-variant">适用于 儿科护理</span>
+</div>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border-l-4 border-secondary flex flex-col gap-4">
+<div class="flex justify-between items-start">
+<div class="space-y-1">
+<span class="text-[10px] font-bold uppercase text-secondary-container bg-secondary px-2 py-0.5 rounded-sm">外治类</span>
+<h3 class="text-xl font-bold text-primary font-headline">中药熏洗技术</h3>
+</div>
+<span class="material-symbols-outlined text-outline-variant" data-icon="bookmark">bookmark</span>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-xs rounded-lg">术后康复</span>
+<span class="px-2 py-1 bg-surface-container text-on-surface-variant text-xs rounded-lg">皮肤护理</span>
+</div>
+<div class="flex items-center gap-3 py-2 border-t border-surface-container-high mt-1">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-secondary" data-icon="history">history</span>
+<span class="text-[11px] text-on-surface-variant">更新于 2024-01-12</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Empty State Motif (Subtle) -->
+<div class="mt-12 flex flex-col items-center justify-center opacity-20 pointer-events-none">
+<span class="material-symbols-outlined text-6xl text-primary" data-icon="potted_plant">potted_plant</span>
+<p class="mt-2 text-xs font-headline italic">Traditional Wisdom, Clinical Precision</p>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-2 bg-[#fbf9f4]/80 dark:bg-slate-900/80 backdrop-blur-xl z-50 border-t border-[#e4e2dd]/30 shadow-[0_-4px_24px_rgba(22,40,57,0.04)]">
+<a class="flex flex-col items-center justify-center text-[#2c3e50]/60 dark:text-slate-500 px-3 py-1 hover:text-[#162839] dark:hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="home_health">home_health</span>
+<span class="font-['Manrope'] text-[11px] tracking-wide font-semibold uppercase">Home</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#162839] dark:text-white bg-[#f5f3ee] dark:bg-slate-800 rounded-xl px-3 py-1 transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="library_books" style="font-variation-settings: 'FILL' 1;">library_books</span>
+<span class="font-['Manrope'] text-[11px] tracking-wide font-semibold uppercase">Knowledge</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#2c3e50]/60 dark:text-slate-500 px-3 py-1 hover:text-[#162839] dark:hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="psychiatry">psychiatry</span>
+<span class="font-['Manrope'] text-[11px] tracking-wide font-semibold uppercase">Assistant</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#2c3e50]/60 dark:text-slate-500 px-3 py-1 hover:text-[#162839] dark:hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined mb-1" data-icon="settings_account_box">settings_account_box</span>
+<span class="font-['Manrope'] text-[11px] tracking-wide font-semibold uppercase">Management</span>
+</a>
+</nav>
+<!-- Floating Action Button - Only for contextually relevant pages -->
+<button class="fixed right-6 bottom-24 w-14 h-14 bg-secondary text-white rounded-full flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition-all z-40">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</button>
+</body></html>
