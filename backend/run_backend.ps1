@@ -1,8 +1,8 @@
 param(
   [string]$ApiKey = "",
-  [int]$Port = 8790,
+  [int]$Port = 18791,
   [string]$AppHost = "0.0.0.0",
-  [string]$Model = "qwen3.5-plus"
+  [string]$Model = "kimi-k2.5"
 )
 
 $pythonCandidates = @(

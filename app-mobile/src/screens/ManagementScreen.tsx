@@ -73,8 +73,6 @@ export function ManagementScreen() {
         ) : (
           <>
             <InfoRow label="接口状态" value={health?.status || "未知"} />
-            <InfoRow label="模型模式" value={overview?.modelMode || health?.mode || "未知"} />
-            <InfoRow label="模型名称" value={overview?.modelName || health?.model || "未知"} />
             <InfoRow label="知识条目" value={`${overview?.articleCount || 0}`} />
             <InfoRow label="目录主篇" value={`${overview?.partCount || 0}`} />
             <InfoRow label="最近更新时间" value={overview?.lastExport || "暂无"} />

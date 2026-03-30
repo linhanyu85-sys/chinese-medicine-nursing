@@ -102,8 +102,6 @@ export type HomePayload = {
 
 export type HealthStatus = {
   status: string;
-  mode: string;
-  model: string;
   articleCount: number;
 };
 
@@ -111,8 +109,6 @@ export type ManagementOverview = {
   articleCount: number;
   partCount: number;
   lastExport: string;
-  modelMode: string;
-  modelName: string;
   sessionFile: string;
   knowledgeSource: string;
 };

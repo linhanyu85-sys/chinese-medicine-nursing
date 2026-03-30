@@ -19,7 +19,7 @@ BACKEND_ROOT = Path(__file__).resolve().parent
 DATA_ROOT = BACKEND_ROOT / "data"
 SESSION_FILE = DATA_ROOT / "session_memory.json"
 HOST = os.getenv("APP_HOST", "0.0.0.0")
-PORT = int(os.getenv("APP_PORT", "8791"))
+PORT = int(os.getenv("APP_PORT", "18791"))
 
 knowledge_service = KnowledgeService(WORKSPACE_ROOT)
 session_store = SessionStore(SESSION_FILE)
@@ -48,8 +48,6 @@ class AppHandler(BaseHTTPRequestHandler):
                 self._json_response(
                     {
                         "status": "正常",
-                        "mode": "阿里百炼大模型" if model_proxy.available() else "本地增强检索",
-                        "model": model_proxy.model,
                         "articleCount": len(knowledge_service.articles),
                     }
                 )
@@ -153,8 +151,6 @@ class AppHandler(BaseHTTPRequestHandler):
             "articleCount": len(knowledge_service.articles),
             "partCount": len(knowledge_service.tree),
             "lastExport": knowledge_service.data.get("stats", {}).get("lastExport", ""),
-            "modelMode": "阿里百炼 Coding Plan" if model_proxy.available() else "本地增强检索",
-            "modelName": model_proxy.model,
             "sessionFile": str(SESSION_FILE),
             "knowledgeSource": str(knowledge_service.docx_path or ""),
         }

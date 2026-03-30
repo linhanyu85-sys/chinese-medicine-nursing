@@ -1,8 +1,8 @@
 param(
   [string]$ApiKey = "",
-  [int]$Port = 8791,
+  [int]$Port = 18791,
   [string]$AppHost = "0.0.0.0",
-  [string]$Model = "qwen3.5-plus"
+  [string]$Model = "kimi-k2.5"
 )
 
 $script = Join-Path $PSScriptRoot "run_backend.ps1"

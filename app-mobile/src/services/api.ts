@@ -13,22 +13,64 @@ function getBaseUrl() {
   return useAppStore.getState().backendUrl.replace(/\/+$/, "");
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getBaseUrl()}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      ...(init?.headers || {}),
-    },
-  });
+const REQUEST_TIMEOUT_MS = 45000;
+const RETRY_TIMES = 1;
 
-  const text = await response.text();
-  const payload = text ? JSON.parse(text) : {};
-  if (!response.ok) {
-    const message = payload?.error || "请求失败";
-    throw new Error(message);
+async function fetchWithTimeout(url: string, init?: RequestInit) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
   }
-  return payload as T;
+}
+
+async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = `${getBaseUrl()}${path}`;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= RETRY_TIMES; attempt += 1) {
+    try {
+      const response = await fetchWithTimeout(url, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          ...(init?.headers || {}),
+        },
+      });
+
+      const text = await response.text();
+      const payload = text ? JSON.parse(text) : {};
+      if (!response.ok) {
+        const message = payload?.error || "请求失败";
+        throw new Error(message);
+      }
+      return payload as T;
+    } catch (err) {
+      const abortError =
+        typeof err === "object" &&
+        err !== null &&
+        "name" in err &&
+        (err as { name?: string }).name === "AbortError";
+      const message =
+        abortError
+          ? "请求超时，请稍后重试"
+          : err instanceof Error
+            ? err.message
+            : "网络异常，请稍后重试";
+
+      lastError = new Error(message);
+      if (attempt < RETRY_TIMES) {
+        continue;
+      }
+    }
+  }
+
+  throw lastError || new Error("请求失败");
 }
 
 export async function fetchHealthStatus() {

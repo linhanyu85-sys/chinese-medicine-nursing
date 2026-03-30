@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import re
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -42,6 +43,16 @@ COMMON_KEYWORDS = [
     "耳穴",
     "推拿",
 ]
+
+# 参考开源 RAG 项目常用的 Hybrid Retrieval（向量 + BM25 + 规则召回）
+TERM_ALIASES: dict[str, list[str]] = {
+    "小孩": ["小儿", "患儿", "儿科", "儿童"],
+    "孩子": ["小儿", "患儿", "儿科", "儿童"],
+    "脑热": ["发热", "高热", "低热", "热"],
+    "头疼": ["头痛", "头部疼痛"],
+    "拉肚子": ["腹泻", "泄泻"],
+    "鼻塞": ["感冒", "外感"],
+}
 
 PART_RE = re.compile(r"^第[一二三四五六七八九十百千万零〇\d]+篇")
 CHAPTER_RE = re.compile(r"^第[一二三四五六七八九十百千万零〇\d]+章")
@@ -149,6 +160,14 @@ def infer_intent(text: str) -> str:
     return "临床护理咨询"
 
 
+def expand_query_terms(normalized: str, query_terms: list[str]) -> list[str]:
+    expanded = list(query_terms)
+    for key, aliases in TERM_ALIASES.items():
+        if key in normalized or key in query_terms:
+            expanded.extend(aliases)
+    return dedup_keep_order(expanded)
+
+
 def iter_block_items(document: DocxDocument) -> Iterable[Paragraph | Table]:
     body = document.element.body
     for child in body.iterchildren():
@@ -249,6 +268,8 @@ class KnowledgeService:
         self.article_map: dict[str, dict[str, Any]] = {}
         self.chapters: list[dict[str, Any]] = []
         self.tag_pool: list[str] = []
+        self.bm25_idf: dict[str, float] = {}
+        self.bm25_avg_len: float = 1.0
         self.load()
 
     def load(self) -> None:
@@ -294,8 +315,12 @@ class KnowledgeService:
                     ]
                 )
             )
+            tokens = terms_of(article["_blob"])
+            article["_tokens"] = tokens
+            article["_tf"] = Counter(tokens)
+            article["_doc_len"] = max(1, len(tokens))
             article["_vector"] = vector_of(article["_blob"])
-            article["_terms"] = set(terms_of(article["_blob"]))
+            article["_terms"] = set(tokens)
             self.articles.append(article)
             article_id = str(article.get("articleId") or "")
             file_label = str(article.get("fileLabel") or "")
@@ -305,6 +330,7 @@ class KnowledgeService:
                 self.article_map[file_label] = article
 
         self.articles.sort(key=lambda item: (item["_order"], str(item.get("articleId") or "")))
+        self._build_bm25_index()
         self._build_chapters()
         self._build_tag_pool()
 
@@ -313,6 +339,28 @@ class KnowledgeService:
         for article in self.articles:
             tags.extend(article.get("tags") or [])
         self.tag_pool = dedup_keep_order(tags)
+
+    def _build_bm25_index(self) -> None:
+        if not self.articles:
+            self.bm25_idf = {}
+            self.bm25_avg_len = 1.0
+            return
+
+        total_docs = len(self.articles)
+        doc_freq: dict[str, int] = {}
+        doc_lens: list[int] = []
+
+        for article in self.articles:
+            tokens = article.get("_tokens") or []
+            doc_lens.append(max(1, len(tokens)))
+            for token in set(tokens):
+                doc_freq[token] = doc_freq.get(token, 0) + 1
+
+        self.bm25_avg_len = max(1.0, sum(doc_lens) / max(1, len(doc_lens)))
+        self.bm25_idf = {
+            token: math.log((total_docs - freq + 0.5) / (freq + 0.5) + 1.0)
+            for token, freq in doc_freq.items()
+        }
 
     def _sort_tree(self, nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
         def clone(node: dict[str, Any]) -> dict[str, Any]:
@@ -823,6 +871,10 @@ class KnowledgeService:
             if kw in normalized:
                 matched_tags.append(kw)
 
+        for key, aliases in TERM_ALIASES.items():
+            if key in normalized:
+                matched_tags.extend(aliases)
+
         for tag in self.tag_pool:
             if tag and tag in normalized:
                 matched_tags.append(tag)
@@ -869,12 +921,36 @@ class KnowledgeService:
             return excerpt(best_line, 220)
         return excerpt(plain, 220)
 
+    def _bm25_score(self, article: dict[str, Any], query_terms: list[str]) -> float:
+        if not self.bm25_idf:
+            return 0.0
+
+        tf = article.get("_tf") or {}
+        doc_len = float(article.get("_doc_len") or 1)
+        avg_len = max(1.0, self.bm25_avg_len)
+        k1 = 1.5
+        b = 0.75
+        score = 0.0
+
+        for term in query_terms[:30]:
+            freq = float(tf.get(term, 0))
+            if freq <= 0:
+                continue
+            idf = self.bm25_idf.get(term, 0.0)
+            denom = freq + k1 * (1 - b + b * (doc_len / avg_len))
+            if denom <= 0:
+                continue
+            score += idf * ((freq * (k1 + 1)) / denom)
+
+        return score
+
     def _score_article(
         self,
         article: dict[str, Any],
         query_vector: list[float],
         query_terms: list[str],
         tags: list[str],
+        query_text: str,
     ) -> tuple[float, list[str]]:
         basis: list[str] = []
         semantic = cosine(query_vector, article.get("_vector", []))
@@ -887,10 +963,44 @@ class KnowledgeService:
             score += min(22, overlap * 2.6)
             basis.append("关键词命中")
 
+        bm25 = self._bm25_score(article, query_terms)
+        if bm25 > 0:
+            score += min(30, bm25 * 10.0)
+            basis.append("BM25匹配")
+
         title_text = str(article.get("title") or "")
         if any(term and term in title_text for term in query_terms[:8]):
             score += 12
             basis.append("标题相关")
+
+        crowd_query = any(key in query_text for key in ("小孩", "小儿", "儿科", "儿童", "患儿"))
+        fever_query = any(key in query_text for key in ("脑热", "发热", "高热", "低热", "热"))
+        headache_query = any(key in query_text for key in ("头疼", "头痛", "头部疼痛"))
+
+        if crowd_query and any(key in title_text for key in ("小儿", "儿科", "儿童", "患儿")):
+            score += 16
+            basis.append("标题人群匹配")
+        if fever_query and "发热" in title_text:
+            score += 14
+            basis.append("标题症状匹配")
+        if headache_query and any(key in title_text for key in ("头痛", "头疼")):
+            score += 10
+            basis.append("标题症状匹配")
+        if crowd_query and fever_query and ("小儿" in title_text or "儿科" in title_text) and "发热" in title_text:
+            score += 24
+            basis.append("标题精准匹配")
+
+        chapter_text = f"{article.get('partTitle', '')} {article.get('chapterTitle', '')}"
+        if any(term and term in chapter_text for term in query_terms[:8]):
+            score += 8
+            basis.append("章节相关")
+
+        query_blob = " ".join(query_terms + tags)
+        if any(key in query_blob for key in ("小儿", "儿科", "患儿", "儿童")) and any(
+            key in article.get("_blob", "") for key in ("小儿", "儿科", "患儿", "儿童")
+        ):
+            score += 10
+            basis.append("人群匹配")
 
         tag_hit = [tag for tag in tags if tag and tag in (article.get("tags") or [])]
         if tag_hit:
@@ -917,16 +1027,17 @@ class KnowledgeService:
         safe_k = max(1, min(top_k, 12))
         query_text = compact_text(" ".join([question, analysis.get("focus", ""), " ".join(analysis.get("memoryTags", []))]))
         query_terms = dedup_keep_order(terms_of(query_text) + (analysis.get("keywords") or []))
+        query_terms = expand_query_terms(query_text, query_terms)
         query_vector = vector_of(query_text)
         matched_tags = analysis.get("matchedTags") or []
 
         ranked: list[tuple[float, dict[str, Any], list[str]]] = []
         for article in self.articles:
-            score, basis = self._score_article(article, query_vector, query_terms, matched_tags)
+            score, basis = self._score_article(article, query_vector, query_terms, matched_tags, query_text)
             ranked.append((score, article, basis))
 
         ranked.sort(key=lambda item: item[0], reverse=True)
-        picked = [item for item in ranked[: safe_k * 3] if item[0] >= 16][:safe_k]
+        picked = [item for item in ranked[: safe_k * 4] if item[0] >= 10][:safe_k]
         chapter_context: dict[str, Any] | None = None
 
         if not picked and self.articles:

@@ -7,13 +7,19 @@ import urllib.request
 from typing import Any
 
 
-DEFAULT_BASE_URL = "https://coding.dashscope.aliyuncs.com/v1"
-DEFAULT_MODEL = "qwen3.5-plus"
+# 采用 OpenAI 兼容协议，可切换阿里百炼、Moonshot(Kimi)等模型网关
+DEFAULT_BASE_URL = "https://api.moonshot.cn/v1"
+DEFAULT_MODEL = "kimi-k2.5"
 
 
 class ModelProxy:
     def __init__(self, api_key: str | None = None, base_url: str | None = None, model: str | None = None) -> None:
-        self.api_key = api_key or os.getenv("ALIYUN_API_KEY") or os.getenv("CODING_PLAN_API_KEY")
+        self.api_key = (
+            api_key
+            or os.getenv("MOONSHOT_API_KEY")
+            or os.getenv("ALIYUN_API_KEY")
+            or os.getenv("CODING_PLAN_API_KEY")
+        )
         self.base_url = (base_url or os.getenv("ALIYUN_BASE_URL") or DEFAULT_BASE_URL).rstrip("/")
         self.model = model or os.getenv("ALIYUN_MODEL") or DEFAULT_MODEL
 
@@ -28,7 +34,7 @@ class ModelProxy:
         memory: dict[str, Any],
     ) -> str:
         if not self.available():
-            return self._fallback_answer(analysis, retrieval)
+            return self._append_citations(self._fallback_answer(analysis, retrieval), retrieval)
 
         hits = retrieval.get("hits", [])[:4]
         evidence_lines: list[str] = []
@@ -62,6 +68,7 @@ class ModelProxy:
                     "当直接证据不足时，可以基于最相关章节进行类比推断，但要明确写出“推断依据不足”提示，"
                     "不得编造超出中医护理常识和给定证据的结论。"
                     "回答用中文，结构固定为：护理判断、护理建议、观察与风险、依据条目。"
+                    "无论问题是否精确命中，都要给出可执行的护理建议，并且必须包含出处。"
                 ),
             },
             {
@@ -80,9 +87,10 @@ class ModelProxy:
         ]
 
         try:
-            return self._chat(messages)
+            answer = self._chat(messages)
         except Exception:
-            return self._fallback_answer(analysis, retrieval)
+            answer = self._fallback_answer(analysis, retrieval)
+        return self._append_citations(answer, retrieval)
 
     def _chat(self, messages: list[dict[str, Any]]) -> str:
         payload = {
@@ -101,7 +109,8 @@ class ModelProxy:
         )
 
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
+            # 移动端问答优先稳定返回，超时后退回本地增强回答，避免前端长时间“网络失败”
+            with urllib.request.urlopen(request, timeout=20) as response:
                 raw = response.read().decode("utf-8")
         except urllib.error.HTTPError as error:
             body = error.read().decode("utf-8", errors="replace")
@@ -125,10 +134,10 @@ class ModelProxy:
         hits = retrieval.get("hits", [])
         if not hits:
             return (
-                "护理判断：当前问题在知识库中没有直接条目，但已定位到相关章节方向。\n"
-                "护理建议：请补充疾病诊断、症状阶段、已实施技术及患者反应后再检索，以便给出更精准意见。\n"
-                "观察与风险：未提供明确适应证和禁忌证前，不建议直接实施操作。\n"
-                "依据条目：暂无直接命中。"
+                "护理判断：当前问题未检索到完全同名条目，已按相近病证与护理场景回溯相关章节。\n"
+                "护理建议：可先采用基础护理路径（症状评估、体征监测、风险分层、宣教随访），并结合知识库相关技术条目选择适宜技术。\n"
+                "观察与风险：重点观察体温、疼痛程度、精神状态及不良反应；若出现持续高热、抽搐、意识改变等应立即上报医生。\n"
+                "依据条目：已按相关章节回溯。"
             )
 
         lead = hits[0]
@@ -139,3 +148,35 @@ class ModelProxy:
             f"观察与风险：重点关注{analysis.get('focus', '病情变化')}及并发症风险，必要时及时上报。\n"
             f"依据条目：{titles or '暂无'}。"
         )
+
+    def _citation_lines(self, retrieval: dict[str, Any]) -> list[str]:
+        hits = retrieval.get("hits", []) or []
+        lines: list[str] = []
+        for idx, item in enumerate(hits[:4], start=1):
+            title = item.get("title", "")
+            file_label = item.get("fileLabel", "")
+            snippet = item.get("snippet", "")
+            lines.append(f"{idx}. [{file_label}] {title}：{snippet}")
+
+        if not lines:
+            chapter = retrieval.get("chapterContext") or {}
+            chapter_title = chapter.get("title", "")
+            chapter_summary = chapter.get("summary", "")
+            if chapter_title:
+                lines.append(f"1. [章节回溯] {chapter_title}：{chapter_summary}")
+        return lines
+
+    def _append_citations(self, answer: str, retrieval: dict[str, Any]) -> str:
+        text = (answer or "").strip()
+        if not text:
+            text = "护理判断：已完成知识库回溯。"
+
+        citation_lines = self._citation_lines(retrieval)
+        if not citation_lines:
+            return text
+
+        marker = "引用依据"
+        if marker in text:
+            return text
+
+        return f"{text}\n\n{marker}\n" + "\n".join(citation_lines)
