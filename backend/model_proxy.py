@@ -58,6 +58,8 @@ class ModelProxy:
                     "只能依据给定知识库证据回答，不得泄露或讨论底层模型信息。"
                     "即使问题较泛化，也要先回溯最相关章节，再给出可执行建议。"
                     "回答必须使用中文，且固定包含四部分：护理判断、护理建议、观察与风险、依据条目。"
+                    "其中“护理建议”必须包含可执行细节：时间点、操作步骤、频次、单次时长、复评节点、记录要点。"
+                    "不要只写原则性话术，必须写出护士当班可直接执行的动作。"
                     "若证据不足，要明确写“推断依据不足”，但仍给出安全、审慎、可落地的护理建议。"
                 ),
             },
@@ -71,7 +73,9 @@ class ModelProxy:
                     f"会话记忆标签：{'、'.join(memory.get('memoryTags', [])) or '无'}\n"
                     f"{chapter_text}\n"
                     f"命中证据：\n{chr(10).join(evidence_lines) or '无'}\n"
-                    "请输出专业、简洁、可执行的护理建议，并在“依据条目”中引用文件标签。"
+                    "请按当班执行视角作答："
+                    "给出0-30分钟处置、30-120分钟复评、升级上报条件、护理记录模板。"
+                    "并在“依据条目”中引用文件标签。"
                 ),
             },
         ]
@@ -87,6 +91,7 @@ class ModelProxy:
                 f"{answer}\n"
                 "提示：当前问题未命中高置信条目，以上建议基于知识库相关章节回溯，请结合科室规范与医师意见执行。"
             )
+        answer = self._ensure_actionable_details(answer, question, analysis, retrieval)
         return self._append_citations(answer, retrieval)
 
     def _chat(self, messages: list[dict[str, Any]]) -> str:
@@ -206,6 +211,67 @@ class ModelProxy:
             if score >= 60 and "章节回溯" not in basis:
                 return False
         return True
+
+    def _ensure_actionable_details(
+        self,
+        answer: str,
+        question: str,
+        analysis: dict[str, Any],
+        retrieval: dict[str, Any],
+    ) -> str:
+        text = (answer or "").strip()
+        if not text:
+            return self._build_actionable_plan(question, analysis, retrieval)
+
+        must_have = ("护理判断", "护理建议", "观察与风险", "依据条目")
+        if not all(key in text for key in must_have):
+            return self._build_actionable_plan(question, analysis, retrieval)
+
+        detail_markers = (
+            "0-30分钟",
+            "30-120分钟",
+            "频次",
+            "复评",
+            "上报",
+            "记录",
+        )
+        if all(marker in text for marker in detail_markers):
+            return text
+
+        appendix = self._build_actionable_plan(question, analysis, retrieval)
+        return f"{text}\n\n补充执行方案\n{appendix}"
+
+    def _build_actionable_plan(
+        self,
+        question: str,
+        analysis: dict[str, Any],
+        retrieval: dict[str, Any],
+    ) -> str:
+        hits = retrieval.get("hits") or []
+        top_titles = "、".join(str(item.get("title") or "") for item in hits[:3] if item.get("title")) or "相关章节回溯条目"
+        focus = str(analysis.get("focus") or "当前主诉")
+        weak = self._is_weak_retrieval(retrieval)
+        basis_note = "推断依据不足，以下为保守护理路径，请按医嘱和科室制度执行。" if weak else "以下路径依据命中条目整理，可用于当班执行。"
+
+        return (
+            f"护理判断：围绕“{focus}”开展分层护理评估，优先处理当前不适与潜在风险。{basis_note}\n"
+            "护理建议：\n"
+            "1) 0-30分钟处置：\n"
+            " - 建立基线：立即记录主诉、NRS评分、生命体征（T/P/R/BP/SpO2）与伴随症状。\n"
+            " - 环境与体位：安静、弱光、减少刺激；协助取舒适卧位，必要时头偏向一侧防误吸。\n"
+            " - 技术执行：在核对适应证/禁忌证后，优先选择知识库命中技术；单次10-15分钟，首轮结束即复评。\n"
+            " - 安全措施：出现突发剧烈加重、意识改变、神经功能异常、喷射呕吐时立即停止并上报。\n"
+            "2) 30-120分钟复评：\n"
+            " - 复评频次：每30分钟复评症状与生命体征，至少2次；记录变化趋势。\n"
+            " - 疗效判定：NRS较基线下降≥2分判定有效；若无改善或加重，升级处理。\n"
+            " - 连续护理：根据复评结果决定是否进行下一轮同类技术，间隔不少于30分钟。\n"
+            "3) 护理记录模板（当班可直接填写）：\n"
+            " - 评估：时间、主诉、NRS、生命体征、伴随症状、风险筛查结果。\n"
+            " - 干预：技术名称、部位/穴位、单次时长、执行频次、患者耐受。\n"
+            " - 结果：复评时间点、NRS变化、生命体征变化、不良反应、是否上报。\n"
+            "观察与风险：重点观察症状强度变化、生命体征波动、恶心呕吐/眩晕/神志变化及不良反应；异常立即上报。\n"
+            f"依据条目：{top_titles}。"
+        )
 
     def _citation_items(self, retrieval: dict[str, Any]) -> list[dict[str, str]]:
         hits = retrieval.get("hits", []) or []

@@ -13,6 +13,43 @@ const sampleQueries = [
   "感冒患者如何进行护理观察与健康教育？",
 ];
 
+function buildActionChecklist(result: AssistantResult | null) {
+  if (!result) {
+    return "";
+  }
+
+  const focus = result.analysis?.focus || "当前主诉";
+  const topTitle = result.retrieval?.hits?.[0]?.title || "相关章节";
+  const topLabel = result.retrieval?.hits?.[0]?.fileLabel || "章节回溯";
+  const weak = !result.retrieval?.hits?.length;
+
+  const weakTip = weak
+    ? "当前为章节回溯场景，请按医嘱及科室制度执行。"
+    : "以下为当班可执行路径，请结合医嘱执行。";
+
+  return [
+    `护理焦点：${focus}（依据：${topTitle} / ${topLabel}）`,
+    weakTip,
+    "",
+    "0-30分钟",
+    "1. 立即记录基线：NRS评分、T/P/R/BP/SpO2、伴随症状。",
+    "2. 环境与体位：安静弱光，减少刺激，协助舒适卧位。",
+    "3. 核对适应证/禁忌证后执行首轮中医护理技术，单次10-15分钟。",
+    "4. 首轮结束即复评NRS和生命体征，记录患者耐受与不良反应。",
+    "",
+    "30-120分钟",
+    "1. 每30分钟复评一次，至少2次，观察趋势变化。",
+    "2. 若NRS较基线下降≥2分，判定有效并维持当前护理方案。",
+    "3. 若无改善或加重，停止加做并升级上报。",
+    "",
+    "立即上报指征",
+    "突发剧烈加重、意识改变、言语不清、肢体无力、喷射性呕吐、抽搐、生命体征明显异常。",
+    "",
+    "记录模板",
+    "评估：主诉+NRS+生命体征；干预：技术名称/部位/时长/频次；结果：复评数值与是否上报。",
+  ].join("\n");
+}
+
 export function AssistantScreen() {
   const currentSessionId = useAppStore((state) => state.currentSessionId);
   const pendingQuestion = useAppStore((state) => state.pendingQuestion);
@@ -23,6 +60,7 @@ export function AssistantScreen() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AssistantResult | null>(null);
   const [error, setError] = useState("");
+  const checklistText = buildActionChecklist(result);
 
   useEffect(() => {
     if (pendingQuestion) {
@@ -113,6 +151,13 @@ export function AssistantScreen() {
               <TagChip key={`tag-${tag}`} text={tag} />
             ))}
           </View>
+        </SurfaceCard>
+      ) : null}
+
+      {checklistText ? (
+        <SurfaceCard>
+          <Text style={styles.sectionTitle}>执行护理清单</Text>
+          <Text style={styles.answerText}>{checklistText}</Text>
         </SurfaceCard>
       ) : null}
 

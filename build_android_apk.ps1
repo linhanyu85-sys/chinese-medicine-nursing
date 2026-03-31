@@ -9,12 +9,26 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -ErrorAction Sile
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $appRoot = Join-Path $projectRoot "app-mobile"
+$runtimeConfigPath = Join-Path $appRoot "src\generated\runtimeConfig.ts"
 
 if (-not (Test-Path -LiteralPath $appRoot)) {
   throw "app-mobile folder not found: $appRoot"
 }
 
 Set-Location -LiteralPath $appRoot
+
+$backendUrlForApk = $env:APP_BACKEND_URL
+if ([string]::IsNullOrWhiteSpace($backendUrlForApk)) {
+  $backendUrlForApk = "http://47.84.99.189:18791"
+}
+
+$runtimeContent = @"
+export const runtimeConfig = {
+  backendUrl: "$backendUrlForApk",
+};
+"@
+Set-Content -LiteralPath $runtimeConfigPath -Value $runtimeContent -Encoding UTF8
+Write-Host "Runtime backend URL for APK: $backendUrlForApk"
 
 if ($Clean) {
   Remove-Item -Recurse -Force ".expo" -ErrorAction SilentlyContinue

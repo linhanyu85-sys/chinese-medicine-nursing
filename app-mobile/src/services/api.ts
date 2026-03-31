@@ -13,12 +13,12 @@ function getBaseUrl() {
   return useAppStore.getState().backendUrl.replace(/\/+$/, "");
 }
 
-const REQUEST_TIMEOUT_MS = 45000;
-const RETRY_TIMES = 1;
+const REQUEST_TIMEOUT_MS = 12000;
+const RETRY_TIMES = 0;
 
-async function fetchWithTimeout(url: string, init?: RequestInit) {
+async function fetchWithTimeout(url: string, timeoutMs: number, init?: RequestInit) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, {
       ...init,
@@ -29,13 +29,13 @@ async function fetchWithTimeout(url: string, init?: RequestInit) {
   }
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+async function requestJson<T>(path: string, init?: RequestInit, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
   const url = `${getBaseUrl()}${path}`;
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= RETRY_TIMES; attempt += 1) {
     try {
-      const response = await fetchWithTimeout(url, {
+      const response = await fetchWithTimeout(url, timeoutMs, {
         ...init,
         headers: {
           "Content-Type": "application/json; charset=utf-8",
@@ -117,7 +117,7 @@ export async function submitQuestion(question: string, sessionId?: string) {
       question,
       sessionId,
     }),
-  });
+  }, 90000);
 }
 
 export async function fetchManagementOverview() {

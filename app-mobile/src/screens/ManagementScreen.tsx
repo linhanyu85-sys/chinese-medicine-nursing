@@ -82,7 +82,6 @@ export function ManagementScreen() {
 
       <SurfaceCard>
         <Text style={styles.sectionTitle}>知识库刷新</Text>
-        <Text style={styles.desc}>更新 Word 教材后可直接刷新，无需重新安装应用。</Text>
         <ActionButton
           label={reloading ? "正在刷新" : "刷新知识库"}
           onPress={async () => {
@@ -138,10 +137,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.subText,
-  },
-  desc: {
-    color: colors.subText,
-    lineHeight: 22,
   },
   errorText: {
     color: colors.danger,

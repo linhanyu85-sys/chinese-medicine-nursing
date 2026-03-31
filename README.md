@@ -17,25 +17,25 @@
 先启动后端（会自动读取本地配置里的 API Key）：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\Desktop\中医适宜技术知识库\stitch\backend\run_backend.ps1"
+powershell -ExecutionPolicy Bypass -File "D:\Desktop\中医适宜技术知识库\UI\backend\run_backend.ps1"
 ```
 
 再启动手机预览：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\Desktop\中医适宜技术知识库\stitch\run_mobile_preview.ps1" -Clear
+powershell -ExecutionPolicy Bypass -File "D:\Desktop\中医适宜技术知识库\UI\run_mobile_preview.ps1" -Clear
 ```
 
 也可以一条命令同时启动：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\Desktop\中医适宜技术知识库\stitch\run_demo.ps1" -Clear
+powershell -ExecutionPolicy Bypass -File "D:\Desktop\中医适宜技术知识库\UI\run_demo.ps1" -Clear
 ```
 
 ## 依赖安装（首次）
 
 ```powershell
-cd "D:\Desktop\中医适宜技术知识库\stitch\app-mobile"
+cd "D:\Desktop\中医适宜技术知识库\UI\app-mobile"
 npm install
 ```
 
