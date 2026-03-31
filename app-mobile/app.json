@@ -2,7 +2,7 @@
   "expo": {
     "name": "\u4e2d\u533b\u9002\u5b9c\u6280\u672f\u52a9\u624b",
     "slug": "zhongyi-shiyi-jishu",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.zhongyi.shiyijishu",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#f6f0e6"
