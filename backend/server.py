@@ -31,7 +31,7 @@ def json_bytes(payload: dict[str, Any]) -> bytes:
 
 
 class AppHandler(BaseHTTPRequestHandler):
-    server_version = "TCMAppBackend/3.0"
+    server_version = "TCMAppBackend/3.1"
 
     def do_OPTIONS(self) -> None:
         self.send_response(HTTPStatus.NO_CONTENT)
@@ -72,7 +72,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 article_id = unquote(path.split("/api/knowledge/article/", 1)[1])
                 article = knowledge_service.get_article(article_id)
                 if not article:
-                    self._json_response({"error": "未找到对应条目"}, status=HTTPStatus.NOT_FOUND)
+                    self._json_error(HTTPStatus.NOT_FOUND, "未找到对应条目")
                     return
                 self._json_response(article)
                 return
@@ -101,9 +101,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 self._serve_asset(relative)
                 return
 
-            self._json_response({"error": "接口不存在"}, status=HTTPStatus.NOT_FOUND)
+            self._json_error(HTTPStatus.NOT_FOUND, "接口不存在")
         except Exception as exc:
-            self._json_response({"error": f"服务异常: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            self._json_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"服务异常: {exc}")
 
     def do_POST(self) -> None:
         try:
@@ -118,7 +118,7 @@ class AppHandler(BaseHTTPRequestHandler):
             if parsed.path == "/api/assistant/query":
                 question = (body.get("question") or "").strip()
                 if not question:
-                    self._json_response({"error": "问题不能为空"}, status=HTTPStatus.BAD_REQUEST)
+                    self._json_error(HTTPStatus.BAD_REQUEST, "问题不能为空")
                     return
 
                 session_id = (body.get("sessionId") or "").strip()
@@ -154,9 +154,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 )
                 return
 
-            self._json_response({"error": "接口不存在"}, status=HTTPStatus.NOT_FOUND)
+            self._json_error(HTTPStatus.NOT_FOUND, "接口不存在")
         except Exception as exc:
-            self._json_response({"error": f"服务异常: {exc}"}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            self._json_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"服务异常: {exc}")
 
     def _management_payload(self) -> dict[str, Any]:
         return {
@@ -168,13 +168,18 @@ class AppHandler(BaseHTTPRequestHandler):
         }
 
     def _serve_asset(self, relative_path: str) -> None:
-        candidate = (WORKSPACE_ROOT / relative_path).resolve()
+        try:
+            candidate = (WORKSPACE_ROOT / relative_path).resolve()
+        except (OSError, RuntimeError, ValueError):
+            self._json_error(HTTPStatus.BAD_REQUEST, "路径参数无效")
+            return
+
         workspace_resolved = WORKSPACE_ROOT.resolve()
         if workspace_resolved not in candidate.parents and candidate != workspace_resolved:
-            self.send_error(HTTPStatus.FORBIDDEN, "禁止访问")
+            self._json_error(HTTPStatus.FORBIDDEN, "禁止访问")
             return
         if not candidate.exists() or not candidate.is_file():
-            self.send_error(HTTPStatus.NOT_FOUND, "资源不存在")
+            self._json_error(HTTPStatus.NOT_FOUND, "资源不存在")
             return
 
         content_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
@@ -204,6 +209,9 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def _json_error(self, status: HTTPStatus, message: str) -> None:
+        self._json_response({"error": message}, status=status)
 
     def _write_cors_headers(self) -> None:
         self.send_header("Access-Control-Allow-Origin", "*")
