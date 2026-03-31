@@ -82,6 +82,16 @@ class AppHandler(BaseHTTPRequestHandler):
                 self._json_response(session_store.get_memory_payload(session_id))
                 return
 
+            if path == "/api/assistant/sessions":
+                limit = int((query.get("limit") or ["30"])[0])
+                self._json_response({"items": session_store.list_sessions(limit=limit)})
+                return
+
+            if path.startswith("/api/assistant/session/"):
+                session_id = unquote(path.split("/api/assistant/session/", 1)[1])
+                self._json_response(session_store.get_session_detail(session_id))
+                return
+
             if path == "/api/management/overview":
                 self._json_response(self._management_payload())
                 return
@@ -101,7 +111,8 @@ class AppHandler(BaseHTTPRequestHandler):
             body = self._read_json_body()
 
             if parsed.path == "/api/assistant/session":
-                self._json_response(session_store.create_session(), status=HTTPStatus.CREATED)
+                title = str(body.get("title") or "").strip() or "新对话"
+                self._json_response(session_store.create_session(title=title), status=HTTPStatus.CREATED)
                 return
 
             if parsed.path == "/api/assistant/query":
@@ -117,7 +128,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
                 memory = session_store.get_memory_payload(session_id)
                 analysis = knowledge_service.analyze_query(question, memory)
-                retrieval = knowledge_service.search(question, analysis, top_k=5)
+                retrieval = knowledge_service.search(question, analysis, top_k=6)
                 answer = model_proxy.generate_answer(question, analysis, retrieval, memory)
                 session_store.append_turn(session_id, question, analysis, retrieval, answer)
 
@@ -128,6 +139,7 @@ class AppHandler(BaseHTTPRequestHandler):
                         "retrieval": retrieval,
                         "answer": answer,
                         "memory": session_store.get_memory_payload(session_id),
+                        "session": session_store.get_session_detail(session_id),
                     }
                 )
                 return

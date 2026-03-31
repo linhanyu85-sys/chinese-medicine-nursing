@@ -1,6 +1,8 @@
 import { useAppStore } from "../store/appStore";
 import type {
   AssistantResult,
+  AssistantSessionDetail,
+  AssistantSessionSummary,
   ArticleCard,
   ArticleDetail,
   HealthStatus,
@@ -104,9 +106,18 @@ export async function fetchArticleDetail(articleId: string) {
 }
 
 export async function createSession() {
-  return requestJson<{ sessionId: string; createdAt: string }>("/api/assistant/session", {
+  return requestJson<{ sessionId: string; createdAt: string; title: string }>("/api/assistant/session", {
     method: "POST",
     body: JSON.stringify({}),
+  });
+}
+
+export async function createNamedSession(title?: string) {
+  return requestJson<{ sessionId: string; createdAt: string }>("/api/assistant/session", {
+    method: "POST",
+    body: JSON.stringify({
+      title,
+    }),
   });
 }
 
@@ -118,6 +129,15 @@ export async function submitQuestion(question: string, sessionId?: string) {
       sessionId,
     }),
   }, 90000);
+}
+
+export async function fetchAssistantSessions(limit = 30) {
+  const payload = await requestJson<{ items: AssistantSessionSummary[] }>(`/api/assistant/sessions?limit=${limit}`);
+  return payload.items;
+}
+
+export async function fetchAssistantSessionDetail(sessionId: string) {
+  return requestJson<AssistantSessionDetail>(`/api/assistant/session/${encodeURIComponent(sessionId)}`);
 }
 
 export async function fetchManagementOverview() {

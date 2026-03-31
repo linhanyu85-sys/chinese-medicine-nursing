@@ -48,7 +48,7 @@ export function HomeScreen() {
           <Pressable style={styles.entry} onPress={() => navigation.navigate("智能问答")}>
             <Text style={styles.entryEyebrowMuted}>智能问答端</Text>
             <Text style={styles.entryTitleDark}>先检索相关章节，再结合上下文给出专业建议</Text>
-            <Text style={styles.entryDescDark}>保留会话重点，连续追问时能更贴近临床场景。</Text>
+            <Text style={styles.entryDescDark}>支持新建对话隔离上下文，并可回看历史会话。</Text>
           </Pressable>
         </View>
       </AnimatedBlock>

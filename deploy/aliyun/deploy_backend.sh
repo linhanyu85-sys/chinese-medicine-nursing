@@ -58,7 +58,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   cp "${DEPLOY_ROOT}/tcm_knowledge_backend.env.example" "${ENV_FILE}"
   sed -i "s/APP_PORT=.*/APP_PORT=${APP_PORT}/" "${ENV_FILE}"
   echo ""
-  echo "已创建 ${ENV_FILE}，请先编辑 ALIYUN_API_KEY 后再重启服务。"
+  echo "已创建 ${ENV_FILE}，请先编辑 ALIYUN_API_KEY 和 KB_DOCX_PATH 后再重启服务。"
 fi
 
 echo "[6/8] 写入 systemd 服务..."
@@ -78,6 +78,11 @@ echo "[8/8] 状态检查..."
 systemctl --no-pager --full status "${SERVICE_NAME}" || true
 sleep 1
 curl -fsS "http://127.0.0.1:${APP_PORT}/api/health" || true
+
+if [[ -f "${ENV_FILE}" ]] && ! grep -q '^KB_DOCX_PATH=' "${ENV_FILE}"; then
+  echo ""
+  echo "提示：未检测到 KB_DOCX_PATH，请把教材 docx 放到服务器本地并写入 ${ENV_FILE}。"
+fi
 
 echo ""
 echo "部署完成。"

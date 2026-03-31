@@ -55,6 +55,10 @@ if ($config -and $config.baseUrl) {
   $env:ALIYUN_BASE_URL = [string]$config.baseUrl
 }
 
+if ($config -and $config.docxPath) {
+  $env:KB_DOCX_PATH = [string]$config.docxPath
+}
+
 $env:APP_PORT = "$Port"
 $env:APP_HOST = $AppHost
 $env:ALIYUN_MODEL = $Model

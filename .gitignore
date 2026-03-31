@@ -2,6 +2,8 @@ backend/local_config.json
 backend/.venv/
 backend/__pycache__/
 backend/data/session_memory.json
+backend/data/knowledge_cache.json
+backend/data/*.docx
 backend/*.log
 app-mobile/node_modules/
 app-mobile/.expo/

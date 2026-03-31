@@ -19,7 +19,7 @@ export const useAppStore = create<AppState>((set) => ({
   currentSessionId: "",
   pendingQuestion: "",
   health: null,
-  setBackendUrl: (backendUrl) => set({ backendUrl: backendUrl.trim() }),
+  setBackendUrl: (backendUrl) => set({ backendUrl: backendUrl.trim(), currentSessionId: "" }),
   setCurrentSessionId: (currentSessionId) => set({ currentSessionId }),
   setPendingQuestion: (pendingQuestion) => set({ pendingQuestion }),
   setHealth: (health) => set({ health }),

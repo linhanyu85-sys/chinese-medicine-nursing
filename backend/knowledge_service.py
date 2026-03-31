@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
 
+from case_analyzer import extract_case_profile
 from docx import Document
 from docx.document import Document as DocxDocument
 from docx.oxml.table import CT_Tbl
@@ -18,6 +19,7 @@ from docx.text.paragraph import Paragraph
 
 
 VECTOR_DIM = 320
+TECHNIQUE_TITLE_KEYWORDS = ("推拿", "灸", "拔罐", "刮痧", "耳穴", "敷贴", "放血")
 
 COMMON_KEYWORDS = [
     "发热",
@@ -790,8 +792,8 @@ class KnowledgeService:
             "quickEntries": quick_entries,
             "sampleQueries": [
                 "小儿发热可用哪些中医适宜技术？",
-                "耳穴压豆在失眠护理中的应用要点是什么？",
-                "糖尿病患者中药湿热敷的护理观察重点有哪些？",
+                "头痛患者耳穴贴压的应用要点和复评指标是什么？",
+                "患者头痛伴恶心畏光、舌偏红苔薄黄脉弦，护士当班该怎么处理？",
                 "感冒患者使用艾灸时有哪些禁忌和风险提醒？",
             ],
             "dailyTip": {
@@ -863,7 +865,8 @@ class KnowledgeService:
 
     def analyze_query(self, question: str, memory: dict[str, Any] | None) -> dict[str, Any]:
         normalized = compact_text(question)
-        keywords = terms_of(question)[:16]
+        case_profile = extract_case_profile(question)
+        keywords = dedup_keep_order((case_profile.get("suggestedTerms") or []) + terms_of(question))[:16]
         memory_tags = dedup_keep_order((memory or {}).get("memoryTags") or [])[:8]
         matched_tags: list[str] = []
 
@@ -881,25 +884,34 @@ class KnowledgeService:
             if len(matched_tags) >= 12:
                 break
 
-        if memory_tags:
+        if case_profile.get("mainComplaint"):
+            matched_tags.append(str(case_profile.get("mainComplaint")))
+
+        matched_tags.extend(case_profile.get("symptoms") or [])
+        matched_tags.extend(item.get("name", "") for item in (case_profile.get("patternCandidates") or []))
+
+        if memory_tags and not case_profile.get("isCase"):
             matched_tags.extend(memory_tags[:3])
 
         matched_tags = dedup_keep_order(matched_tags)[:12]
         recent_focus = str((memory or {}).get("recentFocus") or "")
-        # 仅在标签明确时设置焦点，避免“临床护理”等泛词把任意问题都拉到同一批条目。
-        focus = matched_tags[0] if matched_tags else (recent_focus or "未识别")
+        focus = str(case_profile.get("mainComplaint") or "")
+        if not focus:
+            # 仅在标签明确时设置焦点，避免“临床护理”等泛词把任意问题都拉到同一批条目。
+            focus = matched_tags[0] if matched_tags else (recent_focus or "未识别")
 
         fragments = [frag for frag in re.split(r"[，。；、\n！？? ]+", question) if frag]
         return {
             "question": question,
             "normalized": normalized,
-            "intent": infer_intent(question),
+            "intent": "病例护理咨询" if case_profile.get("isCase") else infer_intent(question),
             "focus": focus,
             "matchedTags": matched_tags,
             "keywords": keywords[:8],
             "fragments": fragments[:6],
             "memoryTags": memory_tags,
-            "useMemory": bool(memory_tags or recent_focus),
+            "useMemory": bool(memory_tags or recent_focus) and not case_profile.get("isCase"),
+            "caseProfile": case_profile,
         }
 
     def _best_snippet(self, article: dict[str, Any], query_terms: list[str]) -> str:
@@ -945,6 +957,85 @@ class KnowledgeService:
 
         return score
 
+    def _is_technique_article(self, article: dict[str, Any]) -> bool:
+        title = str(article.get("title") or "")
+        chapter = str(article.get("chapterTitle") or "")
+        return any(key in title for key in TECHNIQUE_TITLE_KEYWORDS) or any(
+            key in chapter for key in TECHNIQUE_TITLE_KEYWORDS
+        )
+
+    def _classify_hit(self, article: dict[str, Any], case_profile: dict[str, Any]) -> str:
+        title = str(article.get("title") or "")
+        main_complaint = str(case_profile.get("mainComplaint") or "")
+        if main_complaint and main_complaint in title:
+            return "病证条目"
+        if self._is_technique_article(article):
+            return "技术条目"
+        return "参考条目"
+
+    def _select_case_hits(
+        self,
+        candidates: list[tuple[float, dict[str, Any], list[str]]],
+        safe_k: int,
+        case_profile: dict[str, Any],
+    ) -> list[tuple[float, dict[str, Any], list[str]]]:
+        if not candidates or not case_profile.get("isCase"):
+            return candidates[:safe_k]
+
+        selected: list[tuple[float, dict[str, Any], list[str]]] = []
+        main_complaint = str(case_profile.get("mainComplaint") or "")
+        pattern_names = [item.get("name", "") for item in (case_profile.get("patternCandidates") or [])]
+        technique_priority = ("推拿", "耳穴", "敷贴", "刮痧", "拔罐", "灸")
+
+        if main_complaint:
+            disease_hit = next(
+                (
+                    item
+                    for item in candidates
+                    if main_complaint in str(item[1].get("title") or "")
+                    or main_complaint in str(item[1].get("_blob") or "")
+                ),
+                None,
+            )
+            if disease_hit:
+                selected.append(disease_hit)
+
+        technique_hit = next(
+            (
+                item
+                for item in sorted(
+                    candidates,
+                    key=lambda row: (
+                        next(
+                            (
+                                idx
+                                for idx, keyword in enumerate(technique_priority)
+                                if keyword in str(row[1].get("title") or "")
+                            ),
+                            len(technique_priority),
+                        ),
+                        -row[0],
+                    ),
+                )
+                if self._is_technique_article(item[1])
+                and (
+                    main_complaint in str(item[1].get("_blob") or "")
+                    or any(name and name in str(item[1].get("_blob") or "") for name in pattern_names)
+                )
+            ),
+            None,
+        )
+        if technique_hit and technique_hit not in selected:
+            selected.append(technique_hit)
+
+        for item in candidates:
+            if item not in selected:
+                selected.append(item)
+            if len(selected) >= safe_k:
+                break
+
+        return selected[:safe_k]
+
     def _score_article(
         self,
         article: dict[str, Any],
@@ -952,8 +1043,10 @@ class KnowledgeService:
         query_terms: list[str],
         tags: list[str],
         query_text: str,
+        case_profile: dict[str, Any] | None = None,
     ) -> tuple[float, list[str]]:
         basis: list[str] = []
+        case_profile = case_profile or {}
         semantic = cosine(query_vector, article.get("_vector", []))
         score = semantic * 70
         if semantic >= 0.16:
@@ -1008,6 +1101,48 @@ class KnowledgeService:
             score += min(16, len(tag_hit) * 4)
             basis.append("标签匹配")
 
+        main_complaint = str(case_profile.get("mainComplaint") or "")
+        pattern_names = [item.get("name", "") for item in (case_profile.get("patternCandidates") or [])]
+        article_blob = str(article.get("_blob", ""))
+        pain_score = str(case_profile.get("painScore") or "")
+        title_blob = f"{title_text} {article.get('chapterTitle', '')}"
+        heat_like_pattern = any(name in {"肝阳上扰", "风热上扰", "痰浊阻络"} for name in pattern_names)
+
+        if main_complaint:
+            if main_complaint in title_text:
+                score += 18
+                basis.append("主诉匹配")
+            elif main_complaint in article_blob:
+                score += 8
+                basis.append("主诉相关")
+
+        if pattern_names and any(name and name in article_blob for name in pattern_names):
+            score += 12
+            basis.append("证候匹配")
+
+        if case_profile.get("isCase") and self._is_technique_article(article):
+            if main_complaint and main_complaint in article_blob:
+                score += 14
+                basis.append("技术适配")
+            elif any(name and name in article_blob for name in pattern_names):
+                score += 10
+                basis.append("技术适配")
+
+            if main_complaint == "头痛" and any(key in title_blob for key in ("推拿", "耳穴", "敷贴", "刮痧")):
+                score += 8
+                basis.append("技术优先")
+
+            if heat_like_pattern and "灸" in title_blob:
+                score -= 10
+
+        if case_profile.get("dangerSignsPresent") and any(key in article_blob for key in ("观察", "并发症", "风险")):
+            score += 8
+            basis.append("风险观察")
+
+        if pain_score and any(key in article_blob for key in ("疼痛", "止痛", "观察")):
+            score += 4
+            basis.append("疼痛管理")
+
         return score, dedup_keep_order(basis)
 
     def _best_chapter_fallback(self, query_vector: list[float], query_terms: list[str]) -> dict[str, Any] | None:
@@ -1026,34 +1161,44 @@ class KnowledgeService:
 
     def search(self, question: str, analysis: dict[str, Any], top_k: int = 5) -> dict[str, Any]:
         safe_k = max(1, min(top_k, 12))
+        case_profile = analysis.get("caseProfile") or {}
 
         focus = str(analysis.get("focus") or "").strip()
         # 泛化焦点不参与检索，避免将任意问题都误判为同一类护理场景。
         if focus in {"未识别", "临床护理", "一般咨询"}:
             focus = ""
 
+        case_terms = [item for item in (case_profile.get("suggestedTerms") or [])[:12] if item]
         memory_terms = [item for item in (analysis.get("memoryTags") or [])[:4] if item]
+        if case_profile.get("isCase") and len(case_terms) >= 3:
+            memory_terms = []
         query_parts = [question]
         if focus:
             query_parts.append(focus)
+        if case_terms:
+            query_parts.append(" ".join(case_terms))
         if memory_terms:
             query_parts.append(" ".join(memory_terms))
         query_text = compact_text(" ".join(query_parts))
 
-        query_terms = dedup_keep_order(terms_of(query_text) + (analysis.get("keywords") or []))
+        query_terms = dedup_keep_order(case_terms + terms_of(query_text) + (analysis.get("keywords") or []))
         query_terms = expand_query_terms(query_text, query_terms)
         query_vector = vector_of(query_text)
-        matched_tags = analysis.get("matchedTags") or []
+        matched_tags = dedup_keep_order(
+            (analysis.get("matchedTags") or []) + [item.get("name", "") for item in (case_profile.get("patternCandidates") or [])]
+        )
 
         ranked: list[tuple[float, dict[str, Any], list[str]]] = []
         for article in self.articles:
-            score, basis = self._score_article(article, query_vector, query_terms, matched_tags, query_text)
+            score, basis = self._score_article(article, query_vector, query_terms, matched_tags, query_text, case_profile)
             ranked.append((score, article, basis))
 
         ranked.sort(key=lambda item: item[0], reverse=True)
 
         question_text = compact_text(question)
-        broad_question = not matched_tags and not any(key in question_text for key in COMMON_KEYWORDS)
+        broad_question = not case_profile.get("isCase") and not matched_tags and not any(
+            key in question_text for key in COMMON_KEYWORDS
+        )
 
         # 普通问题需要更高阈值，减少“硬命中”误导；临床问题保留较低阈值保证召回率。
         base_threshold = 10.0
@@ -1061,7 +1206,10 @@ class KnowledgeService:
             base_threshold = 28.0
         if broad_question:
             base_threshold = max(base_threshold, 40.0)
-        picked = [item for item in ranked[: safe_k * 4] if item[0] >= base_threshold][:safe_k]
+        if case_profile.get("isCase"):
+            base_threshold = min(base_threshold, 12.0)
+        picked = [item for item in ranked[: safe_k * 6] if item[0] >= base_threshold]
+        picked = self._select_case_hits(picked, safe_k, case_profile)
         chapter_context: dict[str, Any] | None = None
 
         # 对“泛问句”优先走章节回溯，不把弱相关条目当成精准命中。
@@ -1090,6 +1238,7 @@ class KnowledgeService:
                     "articleId": article.get("articleId", ""),
                     "fileLabel": article.get("fileLabel", ""),
                     "title": article.get("title", ""),
+                    "kind": self._classify_hit(article, case_profile),
                     "score": round(score, 2),
                     "basis": basis or ["语义相关"],
                     "snippet": snippet,
